@@ -18,6 +18,8 @@
       padding: 10px;
       z-index: 1000;
       box-shadow: 0 0 5px rgba(0,0,0,0.4);
+      max-height: 90vh;
+      overflow-y: auto;
     }
     .layers {
       margin-top: 10px;
@@ -35,8 +37,7 @@
 
     <div class="layers">
       <strong>Capas de Rutas:</strong><br>
-      <input type="checkbox" id="entradaToggle" checked onchange="toggleLayer(rutaEntradaLayer)"> Ruta Entrada<br>
-      <input type="checkbox" id="salidaToggle" checked onchange="toggleLayer(rutaSalidaLayer)"> Ruta Salida
+      <div id="listaCapas"></div>
     </div>
   </div>
 
@@ -48,39 +49,54 @@
       attribution: '© OpenStreetMap'
     }).addTo(map);
 
-    let rutasEntrada, rutasSalida;
     let rutaCercanaLayer;
-    let rutaEntradaLayer, rutaSalidaLayer;
+    const capas = []; // almacena cada ruta cargada
 
-    // Cargar rutas de entrada
-    fetch('data/rutas_entrada.geojson')
-      .then(response => response.json())
-      .then(data => {
-        rutasEntrada = data;
-        rutaEntradaLayer = L.geoJSON(data, {
-          style: { color: 'blue' },
-          onEachFeature: function (feature, layer) {
-            if (feature.properties && feature.properties.nombre) {
-              layer.bindPopup("Ruta entrada: " + feature.properties.nombre);
-            }
-          }
-        }).addTo(map);
-      });
+    // Lista de archivos GeoJSON a cargar (ajusta con los nombres reales que subas)
+    const archivosGeoJSON = [
+      'data/ruta_88_entrada.geojson',
+      'data/ruta_88_salida.geojson',
+      'data/ruta_89_entrada.geojson',
+      'data/ruta_89_salida.geojson'
+    ];
 
-    // Cargar rutas de salida
-    fetch('data/rutas_salida.geojson')
-      .then(response => response.json())
-      .then(data => {
-        rutasSalida = data;
-        rutaSalidaLayer = L.geoJSON(data, {
-          style: { color: 'green' },
-          onEachFeature: function (feature, layer) {
-            if (feature.properties && feature.properties.nombre) {
-              layer.bindPopup("Ruta salida: " + feature.properties.nombre);
+    archivosGeoJSON.forEach((archivo, index) => {
+      fetch(archivo)
+        .then(response => response.json())
+        .then(data => {
+          const nombre = archivo.split('/').pop().replace('.geojson', '').replace(/_/g, ' ');
+          const capa = L.geoJSON(data, {
+            style: { color: archivo.includes('salida') ? 'green' : 'blue' },
+            onEachFeature: function (feature, layer) {
+              const nombreRuta = feature.properties?.nombre || nombre;
+              layer.bindPopup(nombreRuta);
             }
-          }
-        }).addTo(map);
-      });
+          }).addTo(map);
+
+          capas.push({ nombre, capa, geojson: data });
+
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.checked = true;
+          checkbox.id = 'capa' + index;
+          checkbox.onchange = function () {
+            if (map.hasLayer(capa)) {
+              map.removeLayer(capa);
+            } else {
+              map.addLayer(capa);
+            }
+          };
+
+          const label = document.createElement('label');
+          label.htmlFor = checkbox.id;
+          label.innerText = ' ' + nombre;
+
+          const container = document.getElementById('listaCapas');
+          container.appendChild(checkbox);
+          container.appendChild(label);
+          container.appendChild(document.createElement('br'));
+        });
+    });
 
     function buscarRutaMasCercana() {
       const lat = parseFloat(document.getElementById('lat').value);
@@ -94,14 +110,14 @@
       let minDistancia = Infinity;
       let rutaCercana = null;
 
-      const todasLasRutas = rutasEntrada.features.concat(rutasSalida.features);
-
-      todasLasRutas.forEach(ruta => {
-        const distancia = turf.pointToLineDistance(punto, ruta, {units: 'kilometers'});
-        if (distancia < minDistancia) {
-          minDistancia = distancia;
-          rutaCercana = ruta;
-        }
+      capas.forEach(obj => {
+        obj.geojson.features.forEach(ruta => {
+          const distancia = turf.pointToLineDistance(punto, ruta, { units: 'kilometers' });
+          if (distancia < minDistancia) {
+            minDistancia = distancia;
+            rutaCercana = ruta;
+          }
+        });
       });
 
       if (rutaCercanaLayer) map.removeLayer(rutaCercanaLayer);
@@ -113,14 +129,6 @@
       L.marker([lat, lng]).addTo(map)
         .bindPopup('Ubicación del personal')
         .openPopup();
-    }
-
-    function toggleLayer(layer) {
-      if (map.hasLayer(layer)) {
-        map.removeLayer(layer);
-      } else {
-        map.addLayer(layer);
-      }
     }
   </script>
 </body>
