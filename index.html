@@ -19,6 +19,9 @@
       z-index: 1000;
       box-shadow: 0 0 5px rgba(0,0,0,0.4);
     }
+    .layers {
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -29,6 +32,12 @@
     <label for="lng">Longitud:</label>
     <input type="number" id="lng" step="0.0001"><br>
     <button onclick="buscarRutaMasCercana()">Buscar ruta más cercana</button>
+
+    <div class="layers">
+      <strong>Capas de Rutas:</strong><br>
+      <input type="checkbox" id="entradaToggle" checked onchange="toggleLayer(rutaEntradaLayer)"> Ruta Entrada<br>
+      <input type="checkbox" id="salidaToggle" checked onchange="toggleLayer(rutaSalidaLayer)"> Ruta Salida
+    </div>
   </div>
 
   <script>
@@ -41,23 +50,35 @@
 
     let rutasEntrada, rutasSalida;
     let rutaCercanaLayer;
+    let rutaEntradaLayer, rutaSalidaLayer;
 
-    // Cargar archivos GeoJSON (ajusta las rutas si los colocas en otra carpeta)
+    // Cargar rutas de entrada
     fetch('data/rutas_entrada.geojson')
       .then(response => response.json())
       .then(data => {
         rutasEntrada = data;
-        L.geoJSON(data, {
-          style: { color: 'blue' }
+        rutaEntradaLayer = L.geoJSON(data, {
+          style: { color: 'blue' },
+          onEachFeature: function (feature, layer) {
+            if (feature.properties && feature.properties.nombre) {
+              layer.bindPopup("Ruta entrada: " + feature.properties.nombre);
+            }
+          }
         }).addTo(map);
       });
 
+    // Cargar rutas de salida
     fetch('data/rutas_salida.geojson')
       .then(response => response.json())
       .then(data => {
         rutasSalida = data;
-        L.geoJSON(data, {
-          style: { color: 'green' }
+        rutaSalidaLayer = L.geoJSON(data, {
+          style: { color: 'green' },
+          onEachFeature: function (feature, layer) {
+            if (feature.properties && feature.properties.nombre) {
+              layer.bindPopup("Ruta salida: " + feature.properties.nombre);
+            }
+          }
         }).addTo(map);
       });
 
@@ -92,6 +113,14 @@
       L.marker([lat, lng]).addTo(map)
         .bindPopup('Ubicación del personal')
         .openPopup();
+    }
+
+    function toggleLayer(layer) {
+      if (map.hasLayer(layer)) {
+        map.removeLayer(layer);
+      } else {
+        map.addLayer(layer);
+      }
     }
   </script>
 </body>
